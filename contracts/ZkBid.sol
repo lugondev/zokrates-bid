@@ -5,11 +5,12 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./IVerifier.sol";
 
 contract ZkBid is Ownable {
-    mapping(address => IVerifier.Proof) public userProofs;
-    mapping(address => bool) public bidding;
+    mapping(address => uint256) public bidHashes;
+    mapping(address => uint256) public bidValues;
 
     IVerifier public verifier;
     bool public biddingOpen;
+    bool public biddingEnd;
 
     constructor(address _verifier)
     {
@@ -17,25 +18,49 @@ contract ZkBid is Ownable {
         verifier = IVerifier(_verifier);
 
         biddingOpen = false;
+        biddingEnd = false;
     }
 
     modifier onlyBiddingOpen {
-        require(biddingOpen, "Bidding is not open");
+        require(biddingOpen, "Bidding is closed");
         _;
     }
 
-    function openBidding() public onlyOwner {
+    modifier onlyBiddingEnd {
+        require(biddingEnd, "Bidding is not ended");
+        _;
+    }
+
+    function startBidding() public onlyOwner {
         biddingOpen = true;
     }
 
-    function bid(IVerifier.Proof memory proofBid) public onlyBiddingOpen {
-        require(!bidding[msg.sender], "You are already bidding");
-        userProofs[_msgSender()] = proofBid;
-        bidding[_msgSender()] = true;
+    function endBidding() public onlyOwner onlyBiddingOpen {
+        biddingOpen = false;
+        biddingEnd = true;
     }
 
-    function checkBid(address user) public view returns (bool) {
-        uint8[1] memory input = [0];
-        return verifier.verifyTx(userProofs[user], input);
+    function bid(IVerifier.Proof memory proofBid, uint256 hash) public onlyBiddingOpen {
+        require(bidHashes[_msgSender()] == 0, "You are already bidding");
+        uint256[3] memory input = [0, hash, 1];
+        require(verifier.verifyTx(proofBid, input), "Proof is not correct");
+
+        bidHashes[_msgSender()] = hash;
+    }
+
+    function revealBid(IVerifier.Proof memory proofBid, uint256 bid) public onlyBiddingEnd {
+        require(bidValues[_msgSender()] == 0, "You have already revealed your bid");
+        uint256[3] memory input = [bid, bidHashes[_msgSender()], 1];
+
+        require(verifier.verifyTx(proofBid, input), "Proof is not correct");
+        bidValues[_msgSender()] = bid;
+    }
+
+    function checkBid(IVerifier.Proof memory proofBid, address user) public view returns (bool) {
+        uint256 hash = bidHashes[user];
+        if (hash == 0) return false;
+
+        uint[3] memory input = [0, hash, 1];
+        return verifier.verifyTx(proofBid, input);
     }
 }

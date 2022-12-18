@@ -21,6 +21,6 @@ interface IVerifier {
     }
 
     function verifyTx(
-        Proof memory proof, uint8[1] memory input
+        Proof memory proof, uint[3] memory input
     ) external view returns (bool r);
 }

@@ -1,5 +1,5 @@
 const { getProofBid } = require("./scripts/zk")
 
-getProofBid(22)
+getProofBid(19)
     .then(console.log)
     .catch(console.log)
