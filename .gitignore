@@ -1,15 +1,12 @@
 .idea
 **/artifacts
 **/artifacts/**.*
-contracts/verifier-*.*
+contracts/verifier*.*
 .deps
 cache
-
 
 node_modules
 
 # ZOK compiled
-receiver/out**.*
-sender/out**.*
-receiver/out
-sender/out
+zokrates/out**.*
+zokrates/out

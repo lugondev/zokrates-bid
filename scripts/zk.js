@@ -1,86 +1,47 @@
 const { initialize } = require('zokrates-js')
-const {
-    readReceiverProvingKey,
-    readReceiverZok,
-    readSenderZok,
-    readReceiverVerificationKey,
-    readSenderProvingKey,
-    readSenderVerificationKey,
-} = require("./util")
+const { readZok, readProvingKey, readVerificationKey } = require("./util")
 
-const getComputationBalance = (balance) => initialize().then((zokratesProvider) => {
-    if (balance.toString().startsWith("0") && balance != 0) {
-        balance = balance.toString().substring(1)
+function getArtifacts(zokratesProvider) {
+    const source = readZok()
+    return zokratesProvider.compile(source)
+}
+
+const getComputationValue = (value) => initialize().then((zokratesProvider) => {
+    if (value.toString().startsWith("0") && value != 0) {
+        value = value.toString().substring(1)
     }
+    console.log("computation value:", value)
     const source = `import "hashes/sha256/512bitPacked" as sha256packed;
         def main(private field a, private field b,private field c, private field d) -> field[2] {
     return sha256packed([a, b, c, d]);
     }`;
-
     const artifacts = zokratesProvider.compile(source)
-    const { witness } = zokratesProvider.computeWitness(artifacts, [ "0", "0", "0", `${balance}` ])
+    const { witness } = zokratesProvider.computeWitness(artifacts, [ "0", "0", "0", `${value}` ])
     const [ w1, w0 ] = witness.split("\n")
+    console.log({ w1, w0 })
     const [ , w1Value ] = w1.split(" ")
     const [ , w0Value ] = w0.split(" ")
     return [ w0Value, w1Value ]
 })
 
-function getArtifactsSender(zokratesProvider) {
-    const source = readSenderZok()
-    return zokratesProvider.compile(source)
-}
-
-function getArtifactsReceiver(zokratesProvider) {
-    const source = readReceiverZok()
-    return zokratesProvider.compile(source)
-}
-
-function getProofReceiver(currentValue, updateValue, isDeposit = false) {
-    // if (updateValue <= 0) {
-    //     console.log("Invalid receiver's value")
-    //     return Promise.resolve({})
-    // }
+function getProofBid(bidValue) {
     return initialize().then(async (zokratesProvider) => {
-        const artifactsReceiver = getArtifactsReceiver(zokratesProvider)
-        const [ computationCurrentValue, computationValueAfter ] = await Promise.all([ getComputationBalance(currentValue), getComputationBalance(currentValue + updateValue) ])
-        const computeWitnessArgs = [ `${updateValue}`, `${currentValue}`, isDeposit ? `${updateValue}` : "0", !!currentValue ? computationCurrentValue[0] : "0", computationValueAfter[0] ]
-        const { witness } = zokratesProvider.computeWitness(artifactsReceiver, computeWitnessArgs);
+        const artifacts = getArtifacts(zokratesProvider)
+        const computationValueHash = await getComputationValue(bidValue)
+        console.log({ computationValueHash })
+        const { witness } = zokratesProvider.computeWitness(artifacts, [ `${bidValue}`, `${computationValueHash[0]}` ]);
         // generate proof
-        const proof = zokratesProvider.generateProof(artifactsReceiver.program, witness, readReceiverProvingKey());
+        const proof = zokratesProvider.generateProof(artifacts.program, witness, readProvingKey());
+        console.log({ proof })
         // or verify off-chain
-        const isVerified = zokratesProvider.verify(readReceiverVerificationKey(), proof);
+        const isVerified = zokratesProvider.verify(readVerificationKey(), proof);
 
         if (isVerified) {
             return {
-                proofValues: Object.values(proof.proof), proof: proof.proof, inputs: proof.inputs, params: {
-                    proof: JSON.stringify(Object.values(proof.proof)), hashAfter: computationValueAfter[0],
-                },
-            }
-        }
-        return {}
-    });
-}
-
-function getProofSender(currentValue, updateValue, isWithdraw = false) {
-    // if (updateValue >= currentValue || updateValue <= 0) {
-    //     console.log("Invalid sender's value")
-    //     return Promise.resolve({})
-    // }
-    return initialize().then(async (zokratesProvider) => {
-        const artifactsSender = getArtifactsSender(zokratesProvider)
-        const [ computationCurrentValue, computationValueAfter ] = await Promise.all([ getComputationBalance(currentValue), getComputationBalance(currentValue - updateValue) ])
-        const computeWitnessArgs = [ `${updateValue}`, `${currentValue}`, isWithdraw ? `${updateValue}` : "0", computationCurrentValue[0], computationValueAfter[0] ]
-        const { witness } = zokratesProvider.computeWitness(artifactsSender, computeWitnessArgs)
-        // generate proof
-        const proof = zokratesProvider.generateProof(artifactsSender.program, witness, readSenderProvingKey());
-        // or verify off-chain
-        const isVerified = zokratesProvider.verify(readSenderVerificationKey(), proof);
-
-        if (isVerified) {
-            return {
-                proofValues: Object.values(proof.proof), proof: proof.proof, inputs: proof.inputs, params: {
-                    proof: JSON.stringify(Object.values(proof.proof)), hashAfter: computationValueAfter[0],
-                },
+                proofArray: Object.values(proof.proof),
+                proofObject: proof.proof,
+                inputs: proof.inputs,
+                proofString: JSON.stringify(Object.values(proof.proof)),
             }
         }
         return {}
@@ -88,5 +49,5 @@ function getProofSender(currentValue, updateValue, isWithdraw = false) {
 }
 
 module.exports = {
-    getProofReceiver, getProofSender,
+    getProofBid,
 }

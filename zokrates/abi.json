@@ -1,0 +1,17 @@
+{
+  "inputs": [
+    {
+      "name": "value",
+      "public": false,
+      "type": "field"
+    },
+    {
+      "name": "hash",
+      "public": true,
+      "type": "field"
+    }
+  ],
+  "output": {
+    "type": "field"
+  }
+}

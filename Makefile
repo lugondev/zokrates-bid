@@ -1,23 +1,18 @@
 SHELL=/bin/bash
 
-.PHONY: init compile receiver sender clean
+.PHONY: init compile-zok compile-sol clean
 
-init: clean receiver sender compile-sol
+init: clean make-zok compile-sol
 
-receiver:
-	cd receiver && make
-
-sender:
-	cd sender && make
+make-zok:
+	cd zokrates && make
 
 compile-zok:
-	cd receiver && make compile
-	cd sender && make compile
+	cd zokrates && make compile
 
 compile-sol:
-	cp receiver/verifier-receiver.sol contracts/verifier-receiver.sol
-	cp sender/verifier-sender.sol contracts/verifier-sender.sol
+	cp zokrates/verifier.sol contracts/verifier.sol
 	npx hardhat compile
 
 clean:
-	rm -rf contracts/verifier-receiver.sol contracts/verifier-sender.sol
+	rm -rf contracts/verifier.sol
