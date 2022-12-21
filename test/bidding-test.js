@@ -38,13 +38,14 @@ describe("Bid By ZK", () => {
             let bidValue1 = 21;
             // user must generate proof before deposit
             let proofToBid1 = await getProofBid(bidValue1)
-            // console.log(proofToBid1)
+            console.log(proofToBid1)
 
             // bid with proof generated
             await expect(zkBid.bid(proofToBid1.proofArray, proofToBid1.hashAfter))
                 .to.be.revertedWith("Bidding is closed");
             await zkBid.startBidding()
             await zkBid.bid(proofToBid1.proofArray, proofToBid1.hashAfter)
+            console.log("bidding done")
 
             // checking
             expect(await zkBid.bidHashes(user1.address)).to.equal(proofToBid1.hashAfter);
