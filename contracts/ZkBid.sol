@@ -14,15 +14,16 @@ contract ZkBid is Ownable {
 
     IVerifier public verifier;
     bool public biddingOpen;
-    bool public biddingEnd;
     uint256 public revealed;
+    uint256 public timeReveal;
+    uint256 public deadlineReveal;
 
     constructor(address _verifier) {
         require(_verifier != address(0), "Verifier address cannot be 0x");
         verifier = IVerifier(_verifier);
 
         biddingOpen = false;
-        biddingEnd = false;
+        deadlineReveal = 1 hours;
     }
 
     modifier onlyBiddingOpen() {
@@ -30,18 +31,27 @@ contract ZkBid is Ownable {
         _;
     }
 
-    modifier onlyBiddingEnd() {
-        require(biddingEnd, "Bidding is not ended");
+    modifier onlyRevealTime() {
+        require(
+            block.timestamp <= timeReveal + deadlineReveal,
+            "Reveal time has not started"
+        );
         _;
     }
 
+    function setTimeToReveal(uint256 _newTime) public onlyOwner {
+        deadlineReveal = _newTime;
+    }
+
     function startBidding() public onlyOwner {
+        require(!biddingOpen, "Bidding is already open");
         biddingOpen = true;
     }
 
     function endBidding() public onlyOwner onlyBiddingOpen {
+        require(timeReveal == 0, "Bidding is already ended");
         biddingOpen = false;
-        biddingEnd = true;
+        timeReveal = block.timestamp;
     }
 
     function bid(IVerifier.Proof memory proofBid, uint256 hash)
@@ -58,7 +68,7 @@ contract ZkBid is Ownable {
 
     function revealBid(IVerifier.Proof memory proofBid, uint256 bidValue)
         public
-        onlyBiddingEnd
+        onlyRevealTime
     {
         require(bidHashes[_msgSender()] != 0, "You are not bidding");
         require(
